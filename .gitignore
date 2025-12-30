@@ -1,0 +1,65 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables (IMPORTANT: Don't commit secrets!)
+.env
+.env.*
+!.env.example
+*.env
+.env.local
+.env.production
+.env.staging
+.env.development
+
+# IDEs - Personal settings
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+*~
+# Note: Use .vscode-team/ for shared team configurations
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Python tooling caches
+.ruff_cache/
+.mypy_cache/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
