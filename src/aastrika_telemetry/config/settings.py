@@ -46,6 +46,7 @@ class AppConfig(BaseSettings):
     retry_attempts: int
     retry_delay: int
     hours_window: int
+    fetch_start_date: str
 
     @property
     def es_url(self) -> str:

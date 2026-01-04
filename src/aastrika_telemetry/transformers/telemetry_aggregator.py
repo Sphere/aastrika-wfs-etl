@@ -1,18 +1,22 @@
 """Telemetry data aggregator - aggregates telemetry events."""
 
-from collections import defaultdict
-from aastrika_telemetry.models.events import TelemetryEvent
-from aastrika_telemetry.models.summary import TelemetrySummary
 import logging
+from collections import defaultdict
 from datetime import datetime
 
+from aastrika_telemetry.models.events import TelemetryEvent
+from aastrika_telemetry.models.summary import TelemetrySummary
+
 logger = logging.getLogger(__name__)
+
 
 class TelemetryAggregator:
     """Aggregate telemetry events from Elasticsearch format to PostgreSQL format."""
 
     @staticmethod
-    def transform(telemetry_events: list[TelemetryEvent]) -> list[TelemetrySummary]:
+    def transform(
+        telemetry_events: list[TelemetryEvent],
+    ) -> tuple[list[TelemetrySummary], dict[str, int]]:
         """
         Transform Elasticsearch documents to PostgreSQL-ready format.
 
@@ -29,7 +33,12 @@ class TelemetryAggregator:
 
         for event in telemetry_events:
             # Skip events without required fields
-            if not event.context or not event.context.sid or not event.actor or not event.actor.id:
+            if (
+                not event.context
+                or not event.context.sid
+                or not event.actor
+                or not event.actor.id
+            ):
                 continue
 
             # Extract content_id and course_id
@@ -53,9 +62,6 @@ class TelemetryAggregator:
             # Create composite key: (session_id, content_id, course_id, user_id)
             composite_key = (event.context.sid, content_id, course_id, event.actor.id)
             composite_groups[composite_key].append(event)
-
-
-
 
         summaries = []
         loop_count = 0
@@ -96,10 +102,8 @@ class TelemetryAggregator:
                 end_ets = group_events[-1].ets
                 end_imputed = True
 
-
             # Calculate duration for this combination
-            duration_sec = (end_ets - start_ets)
-
+            duration_sec = end_ets - start_ets
 
             # Log negative duration records for investigation
             if duration_sec <= 0:
@@ -118,7 +122,6 @@ class TelemetryAggregator:
                 # Skip negative duration records
                 negative_duration_count += 1
                 continue
-
 
             # # Generate unique mid: SESCNT_DDMMYYYY_sessionId_contentId_courseId
             date_str = datetime.now().strftime("%d%m%Y")
@@ -150,6 +153,18 @@ class TelemetryAggregator:
 
             summaries.append(session_content_summary)
 
-        logger.info(f"<<<<<<<<<<<<<<< NEGATIVE RECORDS SKIPPED: {negative_duration_count} >>>>>>>>>>>>>>")
-        logger.info(f"<<<<<<<<<<<<<<< TOTAL RECORD COUNT: {loop_count} >>>>>>>>>>>>>>")
-        return summaries
+        stats = {
+            "loop_count": loop_count,
+            "negative_duration_count": negative_duration_count,
+            "summaries_count": len(summaries),
+        }
+
+        # logger.info(
+        #     f"<<<<<<<<<<<<<<< NEGATIVE RECORDS SKIPPED: {negative_duration_count} >>>>>>>>>>>>>>"
+        # )
+        # logger.info(f"<<<<<<<<<<<<<<< TOTAL RECORD COUNT: {loop_count} >>>>>>>>>>>>>>")
+        return summaries, stats  # Instead of just "return summaries"
+
+        # logger.info(f"<<<<<<<<<<<<<<< NEGATIVE RECORDS SKIPPED: {negative_duration_count} >>>>>>>>>>>>>>")
+        # logger.info(f"<<<<<<<<<<<<<<< TOTAL RECORD COUNT: {loop_count} >>>>>>>>>>>>>>")
+        # return summaries
