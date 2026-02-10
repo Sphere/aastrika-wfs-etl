@@ -15,7 +15,6 @@ class AppConfig(BaseSettings):
     app_name: str
     app_version: str
     debug: bool
-    log_level: str
 
     # Elasticsearch Settings
     es_host: str
@@ -47,6 +46,14 @@ class AppConfig(BaseSettings):
     retry_delay: int
     hours_window: int
     fetch_start_date: str
+
+    # Logging Settings
+    log_to_file: bool = False
+    log_dir: str = "logs"
+    log_file_name: str = "telemetry_etl.log"
+    log_max_bytes: int = 10485760  # 10MB
+    log_backup_count: int = 30
+    log_level: str = "INFO"
 
     @property
     def es_url(self) -> str:

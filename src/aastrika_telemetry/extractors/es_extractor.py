@@ -28,13 +28,16 @@ class ElasticsearchExtractor:
 
         if app_config.fetch_start_date:
             self.event_start_time = datetime.strptime(
-                app_config.fetch_start_date, "%d-%m-%Y")
+                app_config.fetch_start_date, "%d-%m-%Y"
+            )
         else:
-            self.event_start_time = datetime.now().replace(
+            self.event_start_time = (datetime.now() - timedelta(days=1)).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
 
-        self.event_end_time = self.event_start_time + timedelta(hours=app_config.hours_window)
+        self.event_end_time = self.event_start_time + timedelta(
+            hours=app_config.hours_window
+        )
 
         self.es_index_pattern = app_config.es_index_pattern
 
@@ -46,14 +49,15 @@ class ElasticsearchExtractor:
             self.es_index = app_config.es_index
 
         logger.info(
-            "<<<<<<<<<<< Elastic Search index used: %s >>>>>>>>>>>", self.es_index
+            ">>>>>>>>>>>>>>>>>>>>> Elastic Search index used: %s <<<<<<<<<<<<<<<<<<<<",
+            self.es_index,
         )
 
         logger.info(
-            "<<<<<<<<<<< ES Fetch Event Start And End Time: %s - %s >>>>>>>>>>>", self.event_start_time, self.event_end_time
+            ">>>>>>>>>>>>>>>>>>>>> Elastic Search Fetch Event Start And End Time: %s - %s <<<<<<<<<<<<<<<<<<<<",
+            self.event_start_time,
+            self.event_end_time,
         )
-
-
 
     def build_query(self, hours_window: int, batch_size: int) -> dict:
         filters = [
@@ -105,8 +109,6 @@ class ElasticsearchExtractor:
         }
 
         return query
-    
-    
 
     def build_session_sorted_query(self) -> dict:
         filters = [
@@ -134,22 +136,26 @@ class ElasticsearchExtractor:
                     }
                 }
             }  # type: ignore
-        )    
+        )
 
         # Sort by session ID only to group all events from same session together
         query = {
             "query": {"bool": {"filter": filters}},
             "sort": [
-                {"telemetry.events.context.sid.keyword": {"order": "asc", "missing": "_last"}},
-                {"telemetry.events.ets": "asc"}  # Secondary sort by timestamp within session
+                {
+                    "telemetry.events.context.sid.keyword": {
+                        "order": "asc",
+                        "missing": "_last",
+                    }
+                },
+                {
+                    "telemetry.events.ets": "asc"
+                },  # Secondary sort by timestamp within session
             ],
             "size": app_config.batch_size,
         }
 
         return query
-
-
-
 
     def extract(
         self, query: dict | None = None, max_docs: int | None = None
@@ -232,7 +238,9 @@ class ElasticsearchExtractor:
             logger.error(f"Error fetching events: {e}")
             return []
 
-    def extract_by_session(self, query: dict | None = None) -> Generator[list[TelemetryEvent], None, None]:
+    def extract_by_session(
+        self, query: dict | None = None
+    ) -> Generator[list[TelemetryEvent], None, None]:
         """
         Stream extraction: yields batches of events grouped by session.
 
@@ -248,7 +256,6 @@ class ElasticsearchExtractor:
             List of TelemetryEvent objects for one session
         """
         try:
-            logger.info("Starting session-based streaming extraction...")
             log_memory_usage("Streaming extraction started")
 
             # Initiate scroll
@@ -274,18 +281,19 @@ class ElasticsearchExtractor:
 
                         # Extract session ID
                         if not event.context or not event.context.sid:
-                            logger.warning("Event missing session ID, skipping")
+                            # logger.warning("Event missing session ID, skipping")
                             continue
 
                         session_id = event.context.sid
 
                         # Check if we've moved to a new session
-                        if current_session_id is not None and session_id != current_session_id:
+                        if (
+                            current_session_id is not None
+                            and session_id != current_session_id
+                        ):
                             # Yield the complete previous session (all events for that session ID)
                             if current_session_events:
                                 total_sessions_yielded += 1
-                                if total_sessions_yielded % 1000 == 0:
-                                    log_memory_usage(f"Streamed {total_sessions_yielded} sessions", total_events_processed)
                                 yield current_session_events
                                 current_session_events = []
 
@@ -305,6 +313,9 @@ class ElasticsearchExtractor:
             # Yield the last session
             if current_session_events:
                 total_sessions_yielded += 1
+                log_memory_usage(
+                    f"Streamed {total_sessions_yielded} sessions - total unfiltered event collected: {total_events_processed}"
+                )
                 yield current_session_events
 
             # Clear scroll
@@ -314,10 +325,8 @@ class ElasticsearchExtractor:
                 pass
 
             logger.info(
-                f"Streaming extraction completed: {total_events_processed} events "
-                f"in {total_sessions_yielded} sessions"
+                f">>>>>>>>>>>> Streaming extraction completed - Events Processed: {total_events_processed} <<<<<<<<<<<<<<<"
             )
-            log_memory_usage("Streaming extraction completed", total_events_processed)
 
         except Exception as e:
             logger.error(f"Error in streaming extraction: {e}")

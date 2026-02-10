@@ -3,6 +3,7 @@
 import logging
 from collections import defaultdict
 from datetime import datetime
+from math import log
 
 from aastrika_telemetry.models.events import TelemetryEvent
 from aastrika_telemetry.models.summary import TelemetrySummary
@@ -30,6 +31,10 @@ class TelemetryAggregator:
 
         # Group events by (session_id, content_id, course_id, user_id)
         composite_groups = defaultdict(list)
+        skipped_event_count = 0
+        valid_event_count = 0
+        summaries = []
+        non_positive_summary_count = 0
 
         for event in telemetry_events:
             # Skip events without required fields
@@ -39,6 +44,7 @@ class TelemetryAggregator:
                 or not event.actor
                 or not event.actor.id
             ):
+                skipped_event_count += 1
                 continue
 
             # Extract content_id and course_id
@@ -57,15 +63,14 @@ class TelemetryAggregator:
 
             # Skip if we don't have content_id or course_id
             if not content_id or not course_id:
+                skipped_event_count += 1
                 continue
 
             # Create composite key: (session_id, content_id, course_id, user_id)
             composite_key = (event.context.sid, content_id, course_id, event.actor.id)
             composite_groups[composite_key].append(event)
+            valid_event_count += 1
 
-        summaries = []
-        loop_count = 0
-        negative_duration_count = 0
 
         for (
             session_id,
@@ -73,8 +78,6 @@ class TelemetryAggregator:
             course_id,
             user_id,
         ), group_events in composite_groups.items():
-            loop_count += 1
-
             # Sort events by timestamp
             group_events.sort(key=lambda e: e.ets)
 
@@ -107,25 +110,19 @@ class TelemetryAggregator:
 
             # Log negative duration records for investigation
             if duration_sec <= 0:
-                logger.error(
-                    f"Negative duration detected: "
-                    f"session_id={session_id}, content_id={content_id}, "
-                    f"course_id={course_id}, user_id={user_id}, "
-                    f"duration_sec={duration_sec:.2f}, "
-                    f"start_ets={start_ets}, end_ets={end_ets}, "
-                    f"end_imputed={end_imputed}, "
-                    f"num_events={len(group_events)}, "
-                    f"event_ids=[{', '.join(e.eid for e in group_events)}], "
-                    f"event_timestamps=[{', '.join(str(e.ets) for e in group_events)}]"
-                )
-                print("_" * 80)
+                # logger.error(
+                #     f"Negative duration detected: "
+                #     f"session_id={session_id}, content_id={content_id}, "
+                #     f"course_id={course_id}, user_id={user_id}, "
+                #     f"duration_sec={duration_sec:.2f}, "
+                # )
+                # print("_" * 80)
                 # Skip negative duration records
-                negative_duration_count += 1
+                non_positive_summary_count += 1
                 continue
 
-            # # Generate unique mid: SESCNT_DDMMYYYY_sessionId_contentId_courseId
-            date_str = datetime.now().strftime("%d%m%Y")
-            unique_mid = f"SESCNT_{date_str}_{session_id}_{content_id}_{course_id}"
+
+            unique_mid = f"SESCNT_{start_ets}_{session_id}_{content_id}_{course_id}"
 
             platform_id = None
             if start_event.context and start_event.context.pdata:
@@ -135,7 +132,6 @@ class TelemetryAggregator:
             if start_event.context and start_event.context.channel:
                 channel_id = start_event.context.channel
 
-            # # Populate TelemetrySummary object
             session_content_summary = TelemetrySummary(
                 user_id=user_id,
                 session_id=session_id,
@@ -154,9 +150,10 @@ class TelemetryAggregator:
             summaries.append(session_content_summary)
 
         stats = {
-            "loop_count": loop_count,
-            "negative_duration_count": negative_duration_count,
-            "summaries_count": len(summaries),
+            "non_positive_summary_count": non_positive_summary_count,
+            "valid_event_summaries": len(summaries),
+            "skipped_events": skipped_event_count,
+            "valid_event_count": valid_event_count,
         }
 
         # logger.info(

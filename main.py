@@ -4,6 +4,7 @@ Entry point for the ETL pipeline: Elasticsearch -> Transform -> PostgreSQL
 """
 
 import logging
+
 from aastrika_telemetry.config.es_config import ElasticsearchConfig
 from aastrika_telemetry.config.postgres_config import PostgresConfig
 
@@ -38,12 +39,10 @@ def test_connections():
 
 def main():
 
-
     # Test connections first
     if not test_connections():
         print("\n Connection tests failed. Please check your .env configuration.")
         return
-
 
 
 if __name__ == "__main__":
