@@ -7,8 +7,10 @@
 
 import json
 import logging
+import time
 from calendar import c
 
+from aastrika_telemetry import pipeline
 from aastrika_telemetry.config.settings import app_config
 from aastrika_telemetry.extractors.es_extractor import ElasticsearchExtractor
 from aastrika_telemetry.loaders.postgres_loader import PostgresLoader
@@ -56,7 +58,7 @@ class TelemetryOrchestrator:
         Returns:
             Number of records loaded
         """
-        logger.info("Using STREAMING mode (session-based, memory efficient)")
+        start_time = time.time()
 
         # Build session-sorted query
         query = self.ec_extractor.build_session_sorted_query()
@@ -68,6 +70,8 @@ class TelemetryOrchestrator:
         cumulative_valid_event_count = 0
         cumulative_skipped_events = 0
         cumulative_total_events = 0
+
+        pending_summaries: list[TelemetrySummary] = []
 
         # Process sessions one at a time
         for session_events in self.ec_extractor.extract_by_session(query):
@@ -82,10 +86,14 @@ class TelemetryOrchestrator:
             cumulative_skipped_events += stats["skipped_events"]
             cumulative_total_events += len(session_events)
 
-            # Load this session's summaries
             if summaries:
-                loaded = self.postgres_loader.load_summaries(summaries)
+                pending_summaries.extend(summaries)
+
+            # Write to DB when batch is full
+            if len(pending_summaries) >= app_config.db_batch_size:
+                loaded = self.postgres_loader.load_summaries(pending_summaries)
                 total_loaded += loaded
+                pending_summaries = []
 
             # Log progress every 1000 sessions
             if session_count % 1000 == 0:
@@ -93,17 +101,28 @@ class TelemetryOrchestrator:
                     f"After {session_count} sessions - total loaded summeries in DB: {total_loaded}"
                 )
 
+        # Flush remaining summaries
+        if pending_summaries:
+            loaded = self.postgres_loader.load_summaries(pending_summaries)
+            total_loaded += loaded
+
         log_memory_usage("Pipeline completed")
         logger.info(
             ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Streaming pipeline completed. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
         )
 
         logger.info(
-            f" ### FINAL STATS: Valid summaries loaded in DB: {cumulative_valid_summaries} | Non-positive summaries skipped: {cumulative_non_positive_count} | "
+            f" ### FINAL STATS: Valid summaries : {cumulative_valid_summaries} | loaded sumarries in DB: {total_loaded} | Non-positive summaries skipped: {cumulative_non_positive_count} | "
             f"Total events: {cumulative_total_events} | Total valid events processed: {cumulative_valid_event_count} | Invalid skipped events: {cumulative_skipped_events} | "
             f"Processed Sessions: {session_count} "
         )
-        
+
+        elapsed = time.time() - start_time
+        hours, remainder = divmod(elapsed, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        logger.info(
+            f"Pipeline completed in {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d} (hh:mm:ss)"
+        )
 
         return total_loaded
 

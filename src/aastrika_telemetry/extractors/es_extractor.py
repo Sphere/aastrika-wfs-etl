@@ -48,6 +48,8 @@ class ElasticsearchExtractor:
         else:
             self.es_index = app_config.es_index
 
+        logger.info("_" * 100)
+
         logger.info(
             ">>>>>>>>>>>>>>>>>>>>> Elastic Search index used: %s <<<<<<<<<<<<<<<<<<<<",
             self.es_index,

@@ -41,6 +41,7 @@ class AppConfig(BaseSettings):
 
     # ETL Pipeline Settings
     batch_size: int
+    db_batch_size: int
     max_workers: int
     retry_attempts: int
     retry_delay: int

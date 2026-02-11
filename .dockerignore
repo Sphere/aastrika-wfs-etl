@@ -1,0 +1,33 @@
+# Environment files (CRITICAL: prevents secrets from being baked into image)
+.env
+.env.*
+*.env
+
+# Git
+.git
+.gitignore
+
+# Python cache
+*.pyc
+__pycache__
+.venv/
+venv/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+.claude/
+
+# Logs (mount as volume at runtime instead)
+logs/
+*.log
+
+# Tests & Docs
+tests/
+docs/
+.pytest_cache/
+
+# Development files
+main.py
+scripts/
