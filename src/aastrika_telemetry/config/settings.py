@@ -26,7 +26,7 @@ class AppConfig(BaseSettings):
     es_timeout: int
     es_max_retries: int
     es_index_pattern: str
-    ex_index_pattern_set: bool = False
+    es_index_pattern_set: bool = False
 
     # PostgreSQL Settings
     postgres_host: str

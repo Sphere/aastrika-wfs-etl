@@ -26,27 +26,25 @@ class ElasticsearchExtractor:
     def __init__(self):
         self.es_client: Elasticsearch = get_es_client()
 
-        if app_config.fetch_start_date:
-            self.event_start_time = datetime.strptime(
-                app_config.fetch_start_date, "%d-%m-%Y"
-            )
+        if app_config.es_index_pattern_set is False:
+            if app_config.fetch_start_date == "":
+                logger.error("FETCH_START_DATE must have date(DD-MM-YYYY) value if ES_INDEX_PATTERN_SET=False")
+                raise ValueError("FETCH_START_DATE must have date(DD-MM-YYYY) value if ES_INDEX_PATTERN_SET=False")
+
+            self.event_start_time = datetime.strptime(app_config.fetch_start_date, "%d-%m-%Y")
+            self.es_index = app_config.es_index
+
         else:
             self.event_start_time = (datetime.now() - timedelta(days=1)).replace(
                 hour=0, minute=0, second=0, microsecond=0
             )
 
+            self.es_index = app_config.es_index_pattern.replace("*", self.event_start_time.strftime("%Y-%m-%d"))
+
         self.event_end_time = self.event_start_time + timedelta(
             hours=app_config.hours_window
         )
 
-        self.es_index_pattern = app_config.es_index_pattern
-
-        if app_config.ex_index_pattern_set:
-            self.es_index = self.es_index_pattern.replace(
-                "*", self.event_start_time.strftime("%Y-%m-%d")
-            )
-        else:
-            self.es_index = app_config.es_index
 
         logger.info("_" * 100)
 
