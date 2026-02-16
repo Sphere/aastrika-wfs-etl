@@ -28,10 +28,16 @@ class ElasticsearchExtractor:
 
         if app_config.es_index_pattern_set is False:
             if app_config.fetch_start_date == "":
-                logger.error("FETCH_START_DATE must have date(DD-MM-YYYY) value if ES_INDEX_PATTERN_SET=False")
-                raise ValueError("FETCH_START_DATE must have date(DD-MM-YYYY) value if ES_INDEX_PATTERN_SET=False")
+                logger.error(
+                    "FETCH_START_DATE must have date(DD-MM-YYYY) value if ES_INDEX_PATTERN_SET=False"
+                )
+                raise ValueError(
+                    "FETCH_START_DATE must have date(DD-MM-YYYY) value if ES_INDEX_PATTERN_SET=False"
+                )
 
-            self.event_start_time = datetime.strptime(app_config.fetch_start_date, "%d-%m-%Y")
+            self.event_start_time = datetime.strptime(
+                app_config.fetch_start_date, "%d-%m-%Y"
+            )
             self.es_index = app_config.es_index
 
         else:
@@ -39,12 +45,13 @@ class ElasticsearchExtractor:
                 hour=0, minute=0, second=0, microsecond=0
             )
 
-            self.es_index = app_config.es_index_pattern.replace("*", self.event_start_time.strftime("%Y-%m-%d"))
+            self.es_index = app_config.es_index_pattern.replace(
+                "*", self.event_start_time.strftime("%Y-%m-%d")
+            )
 
         self.event_end_time = self.event_start_time + timedelta(
             hours=app_config.hours_window
         )
-
 
         logger.info("_" * 100)
 
@@ -330,7 +337,7 @@ class ElasticsearchExtractor:
 
         except Exception as e:
             logger.error(f"Error in streaming extraction: {e}")
-            return
+            raise
 
     def parse_es_event(self, es_doc: dict[str, Any]) -> TelemetryEvent:
         """

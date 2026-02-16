@@ -14,6 +14,7 @@ from aastrika_telemetry.config.es_config import ElasticsearchConfig
 from aastrika_telemetry.config.postgres_config import PostgresConfig
 from aastrika_telemetry.config.settings import app_config
 from aastrika_telemetry.pipeline.orchestrator import TelemetryOrchestrator
+from aastrika_telemetry.utils.email_utils import send_email
 
 # Configure logging
 
@@ -65,8 +66,14 @@ def main():
     print("─" * 60 + "\n", flush=True)
 
     # Run the ETL pipeline
-    orchestrator = TelemetryOrchestrator()
-    orchestrator.run_pipeline()
+    try:
+        orchestrator = TelemetryOrchestrator()
+        result = orchestrator.run_streaming_pipeline()
+        send_email("Telemetry WFS Pipeline - SUCCESS", result)
+    except Exception as e:
+        logger.error("Pipeline failed: %s", str(e))
+        send_email("Telemetry WFS Pipeline - FAILED", f"Error: {str(e)}")
+        raise
 
 
 if __name__ == "__main__":

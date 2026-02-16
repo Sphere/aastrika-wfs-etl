@@ -56,6 +56,13 @@ class AppConfig(BaseSettings):
     log_backup_count: int = 30
     log_level: str = "INFO"
 
+    # AWS SES Email Settings
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "ap-south-1"
+    ses_sender_email: str = ""
+    ses_recipient_email: str = ""
+
     @property
     def es_url(self) -> str:
         """Generate Elasticsearch URL from components."""

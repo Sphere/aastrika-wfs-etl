@@ -9,11 +9,13 @@ import json
 import logging
 import time
 from calendar import c
+from math import log
 
 from aastrika_telemetry import pipeline
 from aastrika_telemetry.config.settings import app_config
 from aastrika_telemetry.extractors.es_extractor import ElasticsearchExtractor
 from aastrika_telemetry.loaders.postgres_loader import PostgresLoader
+from aastrika_telemetry.models import summary
 from aastrika_telemetry.models.events import TelemetryEvent
 from aastrika_telemetry.models.summary import TelemetrySummary
 from aastrika_telemetry.transformers.telemetry_aggregator import TelemetryAggregator
@@ -30,33 +32,12 @@ class TelemetryOrchestrator:
         # self.transformer = TelemetryAggregator()
         self.postgres_loader = PostgresLoader()
 
-    def run_pipeline(
-        self, query: dict | None = None, use_streaming: bool = True
-    ) -> int:
-        """
-        Run the complete ETL pipeline.
-
-        Args:
-            query: Optional Elasticsearch query
-            use_streaming: Use session-based streaming (default: True, recommended for large datasets)
-
-        Returns:
-            Number of records loaded
-        """
-        logger.info("Starting ETL Pipeline...")
-        log_memory_usage("Pipeline started")
-
-        if use_streaming:
-            return self._run_streaming_pipeline()
-        else:
-            return self._run_batch_pipeline()
-
-    def _run_streaming_pipeline(self) -> int:
+    def run_streaming_pipeline(self) -> dict[str, int] | str:
         """
         Run pipeline with session-based streaming (memory efficient).
 
         Returns:
-            Number of records loaded
+            Summary of pipeline run results
         """
         start_time = time.time()
 
@@ -111,21 +92,41 @@ class TelemetryOrchestrator:
             ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Streaming pipeline completed. <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
         )
 
-        logger.info(
-            f" ### FINAL STATS: Valid summaries : {cumulative_valid_summaries} | loaded sumarries in DB: {total_loaded} | Non-positive summaries skipped: {cumulative_non_positive_count} | "
-            f"Total events: {cumulative_total_events} | Total valid events processed: {cumulative_valid_event_count} | Invalid skipped events: {cumulative_skipped_events} | "
-            f"Processed Sessions: {session_count} "
-        )
-
         elapsed = time.time() - start_time
         hours, remainder = divmod(elapsed, 3600)
         minutes, seconds = divmod(remainder, 60)
-        logger.info(
-            f"Pipeline completed in {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d} (hh:mm:ss)"
+
+        execution_summary = (
+            f"Status: SUCCESS\n"
+            f"ES Index: {self.ec_extractor.es_index}\n"
+            f"Duration: {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}\n"
+            f"Sessions Processed: {session_count}\n"
+            f"Total Events: {cumulative_total_events}\n"
+            f"Valid Events: {cumulative_valid_event_count}\n"
+            f"Skipped Events: {cumulative_skipped_events}\n"
+            f"Valid Summaries: {cumulative_valid_summaries}\n"
+            f"Non-positive Skipped: {cumulative_non_positive_count}\n"
+            f"Loaded to DB: {total_loaded}"
         )
 
-        return total_loaded
+        execution_stats = {
+            "status": "SUCCESS",
+            "es_index": self.ec_extractor.es_index,
+            "duration": f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}",
+            "sessions_processed": session_count,
+            "total_events": cumulative_total_events,
+            "valid_events": cumulative_valid_event_count,
+            "skipped_events": cumulative_skipped_events,
+            "valid_summaries": cumulative_valid_summaries,
+            "non_positive_skipped": cumulative_non_positive_count,
+            "loaded_to_db": total_loaded,
+        }
 
+        logger.info(f"Pipeline Summary:\n{execution_stats}")
+
+        return execution_stats
+
+    # This method is kept for reference but is not recommended for large datasets due to high memory usage.
     def _run_batch_pipeline(self) -> int:
         """
         Run pipeline with batch loading (legacy, high memory usage).
