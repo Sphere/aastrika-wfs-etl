@@ -8,6 +8,7 @@ Usage:
 
 import logging
 import os
+from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
 from aastrika_telemetry.config.es_config import ElasticsearchConfig
@@ -56,6 +57,40 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+def automate_backdate():
+    """Automate backdate process for historical data."""
+    logger.info("Starting backdate process for historical data...")
+    # Implement backdate logic here (e.g., loop through past dates, run pipeline for each date)
+
+    start_date = datetime.strptime("04-02-2026", "%d-%m-%Y")
+    end_date = datetime.strptime("15-02-2026", "%d-%m-%Y")
+
+    current_date = start_date
+    while current_date <= end_date:
+        index_name = f"betalaunch-telemetry-{current_date.strftime('%Y-%m-%d')}"
+        print(index_name)
+        # e.g. betalaunch-telemetry-2026-01-18, betalaunch-telemetry-2026-01-19, ...
+
+        app_config.es_index = index_name
+        app_config.fetch_start_date = current_date.strftime("%d-%m-%Y")
+
+        print(
+            f"Running pipeline for index: {index_name} and date: {app_config.fetch_start_date}"
+        )
+
+        # Run back date ETL pipeline
+        try:
+            orchestrator = TelemetryOrchestrator()
+            result = orchestrator.run_streaming_pipeline()
+            send_email("Telemetry WFS Pipeline - SUCCESS", result)
+        except Exception as e:
+            logger.error("Pipeline failed: %s", str(e))
+            send_email("Telemetry WFS Pipeline - FAILED", f"Error: {str(e)}")
+            raise
+
+        current_date += timedelta(days=1)
+
+
 def main():
     """Main entry point for the ETL pipeline."""
 
@@ -65,15 +100,17 @@ def main():
     print("  Starting...", flush=True)
     print("─" * 60 + "\n", flush=True)
 
+    automate_backdate()
+
     # Run the ETL pipeline
-    try:
-        orchestrator = TelemetryOrchestrator()
-        result = orchestrator.run_streaming_pipeline()
-        send_email("Telemetry WFS Pipeline - SUCCESS", result)
-    except Exception as e:
-        logger.error("Pipeline failed: %s", str(e))
-        send_email("Telemetry WFS Pipeline - FAILED", f"Error: {str(e)}")
-        raise
+    # try:
+    #     orchestrator = TelemetryOrchestrator()
+    #     result = orchestrator.run_streaming_pipeline()
+    #     send_email("Telemetry WFS Pipeline - SUCCESS", result)
+    # except Exception as e:
+    #     logger.error("Pipeline failed: %s", str(e))
+    #     send_email("Telemetry WFS Pipeline - FAILED", f"Error: {str(e)}")
+    #     raise
 
 
 if __name__ == "__main__":
