@@ -48,6 +48,6 @@ def log_memory_usage(stage: str, record_count: Optional[int] = None) -> None:
     # Warn if memory usage is high
     if mem['percent'] > 80:
         logger.warning(
-            f"⚠️  High memory usage detected: {mem['percent']:.1f}% - "
+            f"High memory usage detected: {mem['percent']:.1f}% - "
             f"Consider reducing batch size or implementing streaming"
         )
